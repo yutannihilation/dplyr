@@ -880,3 +880,13 @@ test_that("top_n() is hybridised (#2822)", {
   min_rank <- bad_hybrid_handler
   expect_error(top_n(mtcars, 1, cyl), NA)
 })
+
+
+test_that("row_number() falls back to the R implementation for characters (#2792)", {
+  a <- c("a", "b", "C")
+
+  expect_equal(
+    row_number(a),
+    tibble(a = a) %>% mutate(x = row_number(a)) %>% pull(x)
+  )
+})

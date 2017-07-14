@@ -1,10 +1,13 @@
 #ifndef dplyr_OrderVectorVisitor_Impl_H
 #define dplyr_OrderVectorVisitor_Impl_H
 
+#include <tools/SlicingIndex.h>
+
 #include <dplyr/checks.h>
 
 #include <dplyr/comparisons.h>
 
+#include <dplyr/Result/VectorSliceVisitor.h>
 #include <dplyr/CharacterVectorOrderer.h>
 #include <dplyr/OrderVisitor.h>
 #include <dplyr/DataFrameVisitors.h>
@@ -72,11 +75,13 @@ private:
   VECTOR vec;
 };
 
-template <bool ascending>
-class OrderCharacterVectorVisitorImpl : public OrderVisitor {
+template <bool ascending, typename VECTOR>
+class OrderVectorVisitorImpl<STRSXP, ascending, VECTOR> : public OrderVisitor {
 public:
-  OrderCharacterVectorVisitorImpl(const CharacterVector& vec_) :
-    vec(vec_),
+  typedef typename Rcpp::traits::storage_type<STRSXP>::type STORAGE;
+
+  OrderVectorVisitorImpl(const VECTOR& slice) :
+    vec((SEXP) slice),
     orders(CharacterVectorOrderer(vec).get())
   {}
 
@@ -95,6 +100,33 @@ public:
 private:
   CharacterVector vec;
   OrderVectorVisitorImpl<INTSXP, ascending, IntegerVector> orders;
+};
+
+template <typename VECTOR>
+class OrderVectorVisitorImpl<STRSXP, false, VECTOR> : public OrderVisitor {
+public:
+  typedef typename Rcpp::traits::storage_type<STRSXP>::type STORAGE;
+
+  OrderVectorVisitorImpl(const VECTOR& slice) :
+    vec((SEXP) slice),
+    orders(CharacterVectorOrderer(vec).get())
+  {}
+
+  inline bool equal(int i, int j) const {
+    return orders.equal(i, j);
+  }
+
+  inline bool before(int i, int j) const {
+    return orders.before(i, j);
+  }
+
+  SEXP get() {
+    return vec;
+  }
+
+private:
+  CharacterVector vec;
+  OrderVectorVisitorImpl<INTSXP, false, IntegerVector> orders;
 };
 
 // ---------- data frame columns
@@ -259,7 +291,7 @@ inline OrderVisitor* order_visitor_asc_vector(SEXP vec) {
   case LGLSXP:
     return new OrderVectorVisitorImpl<LGLSXP, ascending, Vector<LGLSXP > >(vec);
   case STRSXP:
-    return new OrderCharacterVectorVisitorImpl<ascending>(vec);
+    return new OrderVectorVisitorImpl<STRSXP, ascending, Vector<STRSXP > >(vec);
   case CPLXSXP:
     return new OrderVectorVisitorImpl<CPLXSXP, ascending, Vector<CPLXSXP > >(vec);
   case VECSXP:
